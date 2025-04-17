@@ -12,13 +12,13 @@ def main():
     train_parser.add_argument('--dataset-path', required=True)
     train_parser.add_argument('--epochs', type=int, default=30)
     train_parser.add_argument('--batch-size', type=int, default=32)
-    train_parser.add_argument('--output', default='classifier.pth')
+    train_parser.add_argument('--output', default='my_classifier.pth')
 
-    # Run command 
+    
     run_parser = subparsers.add_parser('run', help='Run inference')
-    run_parser.add_argument('--detector', default='best.pt')
+    run_parser.add_argument('--detector', default='best_1.pt')
     run_parser.add_argument('--classifier', default='classifier.pth')
-    run_parser.add_argument('--source', type=str, default=r"D:\traffic_sign_system\CURE-TSD Unreal Dataset.mp4")
+    run_parser.add_argument('--source', type=str, default=r"D:\traffic_sign_system\v.mp4")
     run_parser.add_argument('--show-fps', action='store_true')
 
     args = parser.parse_args()
@@ -47,12 +47,12 @@ def main():
             # Draw results
             for obj in results:
                 x1, y1, x2, y2 = obj['bbox']
-                cv2.rectangle(frame, (x1+10, y1 +10), (x2 +20, y2 +20), (0, 255, 0), 2)
+                cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
                 label = f"{obj.get('class_name', 'Unknown')} ({obj.get('confidence', 0):.2f})"
 
                 #label = f"{obj['class_name']} ({obj['confidence']:.2f})"
-                cv2.putText(frame, label, (x1, y1-10),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+                cv2.putText(frame, label, (x1, y1),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
             
             if args.show_fps:
                 fps = 1 / (time.time() - start_time)
@@ -60,7 +60,7 @@ def main():
                             cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
             
             cv2.imshow('Traffic Sign Recognition', frame)
-            if cv2.waitKey(0) == ord('q'):
+            if cv2.waitKey(1) == ord('q'):
                 break
                 
         cap.release()
