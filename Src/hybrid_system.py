@@ -6,16 +6,15 @@ from torchvision import transforms
 from classifier import SignClassifier
 
 class HybridSignSystem:
-    def __init__(self, detection_weights='best_1.pt', classification_weights='my_classifier.pth'):
-        # Initialize detector with optimized settings
+    def __init__(self, detection_weights='best_5.pt', classification_weights='my_classifier.pth'):
+        
         self.detector = YOLO(detection_weights)
         self.detector.overrides = {
             'imgsz': 640,
-            'conf': 0.5,  # Lower initial threshold for broader detection
+            'conf': 0.5,  
             'device': 'cuda' if torch.cuda.is_available() else 'cpu'
         }
 
-        # Load classifier with enhanced preprocessing
         self.classifier = SignClassifier()
         self.classifier.load_state_dict(torch.load(classification_weights, map_location='cpu'))
         self.classifier.eval()
@@ -23,10 +22,10 @@ class HybridSignSystem:
         # Unified class mapping
         self.class_names = self._load_class_mapping()
 
-        # Transform matching classifier training
+        # try to matche training classifier dat a
         self.transform = transforms.Compose([
             transforms.ToPILImage(),
-            transforms.Resize((64, 64)),  # Match classifier training size
+            transforms.Resize((64, 64)),  
             transforms.ToTensor(),
             transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                 std=[0.229, 0.224, 0.225])
@@ -74,10 +73,10 @@ class HybridSignSystem:
                 (size-w)//2, (size-w+1)//2,
                 cv2.BORDER_CONSTANT, value=(0,0,0))
             
-            # Apply transformations
+            # use transformer 
             image_tensor = self.transform(image_padded).unsqueeze(0)
             
-            # Get classifier predictions
+            
             with torch.no_grad():
                 outputs = self.classifier(image_tensor)
             probs = torch.nn.functional.softmax(outputs, dim=1)
@@ -89,17 +88,14 @@ class HybridSignSystem:
             return -1, 0.0
 
     def process_frame(self, frame):
-        # Get enhanced detections
         detections = self.detector(frame)[0]
         results = []
 
         for box in detections.boxes:
-            # Extract detection info
             yolo_cls = int(box.cls.item())
             yolo_conf = box.conf.item()
             x1, y1, x2, y2 = map(int, box.xyxy[0].cpu().numpy())
-            
-            # Get ROI with 10% padding
+
             h, w = frame.shape[:2]
             pad_x = int(0.1 * (x2 - x1))
             pad_y = int(0.1 * (y2 - y1))
@@ -107,37 +103,41 @@ class HybridSignSystem:
             y1_pad = max(0, y1 - pad_y)
             x2_pad = min(w, x2 + pad_x)
             y2_pad = min(h, y2 + pad_y)
-            
+
             sign_roi = frame[y1_pad:y2_pad, x1_pad:x2_pad]
             if sign_roi.size == 0:
                 continue
 
-            # Get classifier prediction
             cls_id, cls_conf = self._classify_sign(sign_roi)
-            
-            # Combine predictions
             final_conf = self._ensemble_prediction(yolo_cls, yolo_conf, cls_id, cls_conf)
-            
-            # Threshold for final decision
-            if final_conf < 0.75:  
+
+            if final_conf < 0.75:
                 continue
-                
-            # Select best class (prioritize classifier when confident)
+
             if cls_conf > 0.85:
                 final_class = cls_id
             elif yolo_conf > 0.9:
                 final_class = yolo_cls
             else:
                 final_class = yolo_cls if yolo_conf > cls_conf else cls_id
-                
-            class_name = self.class_names.get(final_class, f'Unknown ({final_class})')
-            color = (0, 255, 0) if yolo_cls == cls_id else (0, 165, 255)  # Green/Orange
 
-            # Draw results
+            class_name = self.class_names.get(final_class, f'Unknown ({final_class})')
+            color = (0, 255, 0) if yolo_cls == cls_id else (0, 165, 255)
+
             cv2.rectangle(frame, (x1_pad, y1_pad), (x2_pad, y2_pad), color, 2)
             label = f"{class_name} Y:{yolo_conf:.2f} C:{cls_conf:.2f} F:{final_conf:.2f}"
             cv2.putText(frame, label, (x1_pad, y1_pad - 10),
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
+
+            
+            print(f"\nDetected sign:")
+            print(f"  YOLO        → {self.class_names.get(yolo_cls)} (conf: {yolo_conf:.2f})")
+            print(f"  Classifier  → {self.class_names.get(cls_id, 'Unknown')} (conf: {cls_conf:.2f})")
+            print(f"  Final Class → {class_name} (combined conf: {final_conf:.2f})")
+            if yolo_cls == cls_id:
+                print(" Both models agree — boosted confidence.")
+            else:
+                print(" Models disagree — using weighted decision.")
 
             results.append({
                 'bbox': [x1_pad, y1_pad, x2_pad, y2_pad],
