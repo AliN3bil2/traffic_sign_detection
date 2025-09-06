@@ -25,6 +25,8 @@ It works on static images, webcam feeds, or video files.
 
 ---
 
+python "main.py" run --detector best_5.pt --classifier my_classifier.pth --source "C:\Users\nabil\Downloads\traffic_sign_detection-main\sample\traffic-sign-test.mp4" --show-fps
+
 ##  Requirements
 
 ```bash
